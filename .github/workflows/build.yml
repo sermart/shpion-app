@@ -1,0 +1,83 @@
+name: Build iOS (unsigned IPA)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Установка npm-пакетов
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Capacitor sync
+        run: npx cap sync ios
+
+      - name: Правки проекта (Info.plist, главный экран, новые файлы)
+        run: |
+          set -euo pipefail
+
+          # --- Info.plist: Face ID, файлы приложения видны в «Файлах»
+          PB=/usr/libexec/PlistBuddy
+          PLIST=ios/App/App/Info.plist
+          set_key() {
+            "$PB" -c "Set :$1 $3" "$PLIST" 2>/dev/null || "$PB" -c "Add :$1 $2 $3" "$PLIST"
+          }
+          set_key NSFaceIDUsageDescription string "Вход в ShpionBot Cloud по Face ID"
+          set_key UIFileSharingEnabled bool true
+          set_key LSSupportsOpeningDocumentsInPlace bool true
+          set_key ITSAppUsesNonExemptEncryption bool false
+
+          # --- Main.storyboard: свой контроллер вместо CAPBridgeViewController
+          SB=ios/App/App/Base.lproj/Main.storyboard
+          perl -0pi -e 's/customClass="CAPBridgeViewController"(\s+customModule="Capacitor")?(\s+customModuleProvider="target")?/customClass="MainViewController" customModule="App" customModuleProvider="target"/' "$SB"
+          grep -q 'customClass="MainViewController"' "$SB" || { echo "Не удалось заменить контроллер в Main.storyboard"; cat "$SB"; exit 1; }
+
+          # --- новые Swift-файлы в проект Xcode
+          ruby scripts/ci_patch.rb
+
+      - name: Сборка (без подписи)
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/dd \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Упаковка .ipa
+        run: |
+          set -euo pipefail
+          APP=$(find build/dd/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
+          test -n "$APP"
+          rm -rf Payload ShpionBotCloud.ipa
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qry ShpionBotCloud.ipa Payload
+          ls -lh ShpionBotCloud.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ShpionBotCloud-ipa
+          path: ShpionBotCloud.ipa
+          if-no-files-found: error

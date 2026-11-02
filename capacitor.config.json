@@ -1,0 +1,17 @@
+{
+  "appId": "ru.shpionbot.cloud",
+  "appName": "ShpionBot Cloud",
+  "webDir": "www",
+  "server": {
+    "url": "https://cloud.shpionbot.ru",
+    "cleartext": false,
+    "allowNavigation": ["cloud.shpionbot.ru", "shpionbot.ru"],
+    "errorPath": "offline.html"
+  },
+  "android": {
+    "appendUserAgent": "ShpionBotApp"
+  },
+  "ios": {
+    "appendUserAgent": "ShpionBotApp"
+  }
+}

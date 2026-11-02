@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Нет подключения</title>
+<style>
+  html,body{height:100%;margin:0;background:#050505;color:#f2f2f2;
+    font-family:-apple-system,"Segoe UI",Roboto,sans-serif;}
+  .wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;padding:32px;text-align:center;box-sizing:border-box;}
+  svg{width:72px;height:72px;fill:none;stroke:#2fc272;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+  h1{margin:6px 0 0;font-size:21px;font-weight:700;}
+  p{margin:0;max-width:320px;font-size:14.5px;line-height:1.55;color:#868686;}
+  button{margin-top:10px;padding:13px 28px;border:0;border-radius:12px;background:#2fc272;color:#04140b;
+    font-size:15px;font-weight:700;}
+  button:active{opacity:.8}
+  #st{font-size:12.5px;color:#868686;min-height:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <svg viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16.2a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="0.6"/><path d="M3 3l18 18"/></svg>
+  <h1>Нет подключения к сети</h1>
+  <p>Проверьте Wi-Fi или мобильный интернет. Приложение подключится само, как только появится связь.</p>
+  <button id="retry">Повторить</button>
+  <div id="st"></div>
+</div>
+<script>
+  var SITE = 'https://cloud.shpionbot.ru/';
+  var busy = false;
+  function check(manual) {
+    if (busy) return;
+    busy = true;
+    document.getElementById('st').textContent = 'Проверяю соединение…';
+    var ctl = new AbortController();
+    var to = setTimeout(function () { ctl.abort(); }, 6000);
+    fetch(SITE + 'login?_=' + Date.now(), {mode: 'no-cors', cache: 'no-store', signal: ctl.signal})
+      .then(function () { clearTimeout(to); location.replace(SITE); })
+      .catch(function () {
+        clearTimeout(to); busy = false;
+        document.getElementById('st').textContent = manual ? 'Связи пока нет' : '';
+      });
+  }
+  document.getElementById('retry').onclick = function () { check(true); };
+  window.addEventListener('online', function () { check(false); });
+  setInterval(function () { check(false); }, 5000);
+</script>
+</body>
+</html>
